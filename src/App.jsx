@@ -39,7 +39,6 @@ import {
 } from 'lucide-react';
 
 // --- FIREBASE SETUP ---
-// Configuración exacta extraída de tu captura de pantalla
 const firebaseConfig = {
   apiKey: "AIzaSyA0gbmO9wtNlrfiSW2O2U-j9WmvOlZliWs",
   authDomain: "caseta-udr.firebaseapp.com",
@@ -49,8 +48,8 @@ const firebaseConfig = {
   appId: "1:1089475835556:web:8f702ca471e5318d1d5831"
 };
 
-// Inicialización de Firebase
-const app = initializeApp(firebaseConfig);
+// Inicialización controlada
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = "caseta-udr"; 
@@ -59,9 +58,9 @@ const appId = "caseta-udr";
 const MASTER_ADMIN_ID = '123';
 const MASTER_ADMIN_PASS = 'test';
 
-// 1. Archivo local (Nombre del archivo SVG subido)
+// 1. Archivo local
 const LOCAL_LOGO = "logo.svg";
-// 2. URL Pública fiable (Fallback)
+// 2. Fallback
 const ONLINE_LOGO = "https://www.lapreferente.com/imagenes/escudos/1286.png";
 
 // --- UTILS & HELPERS ---
@@ -69,14 +68,16 @@ const ONLINE_LOGO = "https://www.lapreferente.com/imagenes/escudos/1286.png";
 const getBlockStart = (date) => {
   const d = new Date(date);
   const day = d.getDay(); 
+  // Jueves (4) es el inicio. 
+  // Calculamos la diferencia para retroceder al Jueves más reciente
   let diff = 0;
-  if (day === 4) diff = 0;
-  if (day === 5) diff = -1;
-  if (day === 6) diff = -2;
-  if (day === 0) diff = -3;
-  if (day === 1) diff = -4;
-  if (day === 2) diff = -5; 
-  if (day === 3) diff = -6; 
+  if (day === 4) diff = 0; // Jueves
+  if (day === 5) diff = -1; // Viernes
+  if (day === 6) diff = -2; // Sábado
+  if (day === 0) diff = -3; // Domingo
+  if (day === 1) diff = -4; // Lunes
+  if (day === 2) diff = -5; // Martes
+  if (day === 3) diff = -6; // Miércoles (Bloqueamos o asignamos al anterior)
 
   const start = new Date(d);
   start.setDate(d.getDate() + diff);
@@ -102,7 +103,8 @@ const isDateInBlock = (checkDate, blockStartDateStr) => {
   check.setHours(0,0,0,0);
   const diffTime = check - blockStart;
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-  return diffDays >= 0 && diffDays <= 4;
+  // Extendemos hasta 5 días (Jueves a Martes inclusive)
+  return diffDays >= 0 && diffDays <= 5;
 };
 
 // --- COMPONENT: ROBUST LOGO LOADER ---
@@ -118,35 +120,23 @@ const UDRLogo = ({ className }) => {
     }
   };
 
-  // Si falla la carga del archivo, mostramos un escudo vectorial generado en código
   if (hasError) {
     return (
       <div className={`${className} flex items-center justify-center`} title="U.D. Roteña">
         <svg viewBox="0 0 100 120" className="w-full h-full drop-shadow-lg">
-          {/* Forma del Escudo */}
           <path d="M10,10 Q50,20 90,10 V40 Q90,90 50,110 Q10,90 10,40 Z" fill="white" stroke="#1a1a1a" strokeWidth="2" />
-          
-          {/* División superior izquierda (Rayas Verdiblancas) */}
           <path d="M12,12 Q30,15 48,12 V50 H12 Z" fill="#007a33" /> 
           <rect x="18" y="12" width="6" height="38" fill="white" />
           <rect x="30" y="12" width="6" height="38" fill="white" />
           <rect x="42" y="12" width="6" height="38" fill="white" />
-
-          {/* División superior derecha (Castillo y Mar) */}
           <path d="M52,12 Q70,15 88,12 V50 H52 Z" fill="#87CEEB" />
-          {/* Castillo Simplificado */}
           <path d="M60,35 L60,25 L65,25 L65,20 L75,20 L75,25 L80,25 L80,35 Z" fill="#FFD700" stroke="black" strokeWidth="0.5"/>
           <rect x="68" y="30" width="4" height="6" fill="black" rx="2" />
-          
-          {/* Banda Diagonal (Nombre) */}
           <path d="M10,40 L90,65 L90,85 L10,60 Z" fill="#FFD700" stroke="black" strokeWidth="1" />
           <text x="50" y="70" textAnchor="middle" fontSize="14" fontWeight="bold" fill="black" transform="rotate(12, 50, 70)" style={{fontFamily: 'Arial'}}>P.U.D.R.</text>
-
-          {/* Parte Inferior (Rojo y Negro) */}
-          <path d="M12,65 L48,75 V105 Q20,90 12,65 Z" fill="#ce1126" /> {/* Rojo */}
-          <path d="M52,76 L88,88 V55 Q88,90 52,105 Z" fill="black" /> {/* Negro - Ajuste visual */}
-          <path d="M50,75 V108 Q50,108 50,108" stroke="black" strokeWidth="0.5"/> {/* Línea central */}
-          {/* Relleno negro correcto */}
+          <path d="M12,65 L48,75 V105 Q20,90 12,65 Z" fill="#ce1126" />
+          <path d="M52,76 L88,88 V55 Q88,90 52,105 Z" fill="black" />
+          <path d="M50,75 V108 Q50,108 50,108" stroke="black" strokeWidth="0.5"/>
           <path d="M50,75 L90,85 V45 Q90,90 50,108 Z" fill="black" />
           <path d="M10,60 L50,73 V108 Q10,90 10,60 Z" fill="#D22B2B" />
         </svg>
@@ -399,7 +389,7 @@ const AdminPanel = ({
                 </div>
 
                 <div className="mt-8">
-                  <p className="text-sm font-bold text-gray-700 mb-4 ml-2">Listado de Administradores</p>
+                  <p className="text-sm font-bold text-gray-700 mb-4 ml-2">Listado de Administradores ({admins.length})</p>
                   <ul className="space-y-3">
                       <li className="bg-gradient-to-r from-red-50 to-white border border-red-200 p-4 rounded-xl flex justify-between items-center shadow-sm">
                         <span className="font-bold text-red-900 text-sm flex items-center gap-2"><Lock size={16}/> Master (123)</span>
@@ -673,8 +663,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // Escuchar DB
     if (!user || !db) return;
     
+    // 1. Reservas
     const qRes = query(collection(db, 'artifacts', appId, 'public', 'data', 'reservations'));
     const unsubRes = onSnapshot(qRes, (snapshot) => {
       const resData = [];
@@ -687,7 +679,7 @@ export default function App() {
           const diffDays = (now - created) / (1000 * 60 * 60 * 24);
           if (diffDays > 5) {
             isExpired = true;
-            deleteDoc(docSnap.ref);
+            deleteDoc(docSnap.ref); // Limpieza automática
           }
         }
         if (!isExpired) resData.push({ id: docSnap.id, ...data });
@@ -695,10 +687,14 @@ export default function App() {
       setReservations(resData);
     });
 
+    // 2. Admins
     const qAdmins = query(collection(db, 'artifacts', appId, 'public', 'data', 'admins'));
     const unsubAdmins = onSnapshot(qAdmins, (snapshot) => {
       const adData = [];
-      snapshot.forEach(doc => adData.push({ id: doc.id, ...doc.data() }));
+      snapshot.forEach(doc => {
+        // Aseguramos que tenemos el ID
+        adData.push({ id: doc.id, ...doc.data() });
+      });
       setAdmins(adData);
     });
 
@@ -706,7 +702,7 @@ export default function App() {
       unsubRes();
       unsubAdmins();
     };
-  }, [user]);
+  }, [user]); // Dependencia clave
 
   // --- HANDLERS ---
 
@@ -725,12 +721,14 @@ export default function App() {
 
   const handleLogin = (e) => {
     e.preventDefault();
+    // Master
     if (adminUser.id === MASTER_ADMIN_ID && adminUser.pass === MASTER_ADMIN_PASS) {
       setIsAdminLoggedIn(true);
       setCurrentAdminId(MASTER_ADMIN_ID);
       setView('adminPanel');
       return;
     }
+    // Sub-admins
     const validSubAdmin = admins.find(a => a.memberId === adminUser.id && a.password === adminUser.pass);
     if (validSubAdmin) {
        setIsAdminLoggedIn(true);
@@ -738,22 +736,23 @@ export default function App() {
        setView('adminPanel');
        return;
     }
-    // Simple alert workaround in case environment blocks alerts, use visual feedback ideally but keeping simple
-    console.log('Credenciales incorrectas');
+    // Fallback error visual (podría ser un toast)
+    alert('Credenciales incorrectas');
   };
 
   const handleAddAdmin = async () => {
     if (!newAdminData.id || !newAdminData.pass) return;
     try {
+      // Usamos el ID de socio como ID del documento para evitar duplicados
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'admins', newAdminData.id), {
         memberId: newAdminData.id,
         password: newAdminData.pass,
         addedBy: currentAdminId,
         createdAt: serverTimestamp()
       });
-      setNewAdminData({ id: '', pass: '' });
+      setNewAdminData({ id: '', pass: '' }); // Limpiar formulario
     } catch (e) {
-      console.error(e);
+      console.error("Error adding admin:", e);
     }
   };
 
@@ -791,7 +790,7 @@ export default function App() {
       setIsModalOpen(false);
       setFormData({ firstName: '', lastName: '', isMember: false, memberNumber: '' });
     } catch (err) {
-      console.error(err);
+      console.error("Error making reservation:", err);
     }
   };
 
@@ -843,9 +842,10 @@ export default function App() {
       const blockStart = getBlockStart(date);
       const blockId = formatDateId(blockStart);
       
-      // Check if this date is part of a "weekend block" (Thu-Mon approx)
+      // Check if this date is part of a "weekend block" (Thu-Tue approx)
       const isInBlock = isDateInBlock(date, blockStart);
       
+      // Find reservation by matching exact ID string
       const reservation = reservations.find(r => r.id === blockId);
       
       // Styling logic
@@ -889,11 +889,16 @@ export default function App() {
           <span className={`text-lg font-bold ${textColor}`}>{d}</span>
           
           {reservation && isInBlock && (
-              <div className="self-end bg-black/20 p-1.5 rounded-full backdrop-blur-sm">
-                  {reservation.status === 'confirmed' 
-                    ? <Check size={16} className="text-white" strokeWidth={3} /> 
-                    : <Clock size={16} className="text-white" strokeWidth={3} />
-                  }
+              <div className="self-end w-full flex justify-end items-center gap-1">
+                  <span className="text-[10px] uppercase font-black tracking-tighter opacity-90 text-white drop-shadow-sm">
+                    {reservation.status === 'confirmed' ? 'PAGADO' : 'PENDIENTE'}
+                  </span>
+                  <div className="bg-black/20 p-1 rounded-full backdrop-blur-sm">
+                      {reservation.status === 'confirmed' 
+                        ? <Check size={14} className="text-white" strokeWidth={3} /> 
+                        : <Clock size={14} className="text-white" strokeWidth={3} />
+                      }
+                  </div>
               </div>
           )}
         </button>

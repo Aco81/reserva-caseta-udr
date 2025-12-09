@@ -52,7 +52,8 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = "caseta-udr"; 
+// Usamos un ID fijo para asegurar que todos lean/escriban en el mismo sitio
+const appId = "caseta-udr-production"; 
 
 // --- CONSTANTS ---
 const MASTER_ADMIN_ID = '123';
@@ -67,9 +68,10 @@ const ONLINE_LOGO = "https://www.lapreferente.com/imagenes/escudos/1286.png";
 
 const getBlockStart = (date) => {
   const d = new Date(date);
+  d.setHours(0, 0, 0, 0); // Normalizar hora
   const day = d.getDay(); 
-  // Jueves (4) es el inicio. 
-  // Calculamos la diferencia para retroceder al Jueves más reciente
+  
+  // Calculamos para que el bloque siempre empiece el JUEVES anterior
   let diff = 0;
   if (day === 4) diff = 0; // Jueves
   if (day === 5) diff = -1; // Viernes
@@ -77,15 +79,15 @@ const getBlockStart = (date) => {
   if (day === 0) diff = -3; // Domingo
   if (day === 1) diff = -4; // Lunes
   if (day === 2) diff = -5; // Martes
-  if (day === 3) diff = -6; // Miércoles (Bloqueamos o asignamos al anterior)
+  if (day === 3) diff = -6; // Miércoles
 
   const start = new Date(d);
   start.setDate(d.getDate() + diff);
-  start.setHours(0, 0, 0, 0);
   return start;
 };
 
 const formatDateId = (date) => {
+  // Aseguramos formato YYYY-MM-DD local consistente
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
@@ -98,12 +100,17 @@ const formatDisplayDate = (date) => {
 
 const isDateInBlock = (checkDate, blockStartDateStr) => {
   if (!blockStartDateStr) return false;
+  // Convertimos strings a fechas limpias a medianoche
   const blockStart = new Date(blockStartDateStr);
+  blockStart.setHours(0,0,0,0);
+  
   const check = new Date(checkDate);
   check.setHours(0,0,0,0);
+  
   const diffTime = check - blockStart;
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-  // Extendemos hasta 5 días (Jueves a Martes inclusive)
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)); 
+  
+  // El bloque dura 6 días visualmente (Jueves, Viernes, Sabado, Domingo, Lunes, Martes)
   return diffDays >= 0 && diffDays <= 5;
 };
 
@@ -396,7 +403,7 @@ const AdminPanel = ({
                         <span className="text-[10px] uppercase font-black bg-red-600 text-white px-3 py-1 rounded-full shadow-sm">Principal</span>
                       </li>
                       {admins.map(a => (
-                          <li key={a.id} className="bg-white border border-gray-200 p-4 rounded-xl flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow">
+                          <li key={a.id || a.memberId} className="bg-white border border-gray-200 p-4 rounded-xl flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex justify-between items-center border-b border-gray-50 pb-2">
                                 <span className="font-mono font-bold text-sm flex items-center gap-2 text-gray-700">
                                   <User size={16} className="text-gray-400"/> Socio {a.memberId}
@@ -859,20 +866,20 @@ export default function App() {
           if (reservation) {
               if (reservation.status === 'confirmed') {
                   // PAGADO: Rojo Intenso
-                  bgColor = 'bg-gradient-to-br from-red-600 to-red-800';
+                  bgColor = '!bg-gradient-to-br from-red-600 to-red-800';
                   borderColor = 'border-red-900';
                   textColor = 'text-white';
                   shadow = 'shadow-red-900/50 shadow-lg';
               } else {
                   // PENDIENTE: Naranja Solar
-                  bgColor = 'bg-gradient-to-br from-orange-400 to-orange-500';
+                  bgColor = '!bg-gradient-to-br from-orange-400 to-orange-500';
                   borderColor = 'border-orange-600';
                   textColor = 'text-white';
                   shadow = 'shadow-orange-500/50 shadow-lg';
               }
           } else {
              // LIBRE: Verde Esmeralda
-             bgColor = 'bg-gradient-to-br from-emerald-400 to-emerald-600 hover:from-emerald-300 hover:to-emerald-500 cursor-pointer';
+             bgColor = '!bg-gradient-to-br from-emerald-400 to-emerald-600 hover:from-emerald-300 hover:to-emerald-500 cursor-pointer';
              borderColor = 'border-emerald-300'; 
              textColor = 'text-white font-black drop-shadow-md';
              shadow = 'shadow-emerald-500/30 shadow-lg';
@@ -881,7 +888,7 @@ export default function App() {
 
       days.push(
         <button 
-          key={d} 
+          key={`${blockId}-${d}-${reservation?.status || 'none'}`}
           onClick={() => isInBlock ? handleDayClick(date) : null}
           disabled={!isInBlock}
           className={`h-20 sm:h-24 rounded-2xl border flex flex-col items-start justify-between p-2 transition-all relative ${bgColor} ${borderColor} ${shadow} ${isInBlock && !reservation ? 'hover:scale-[1.05] active:scale-95' : ''}`}
@@ -889,16 +896,11 @@ export default function App() {
           <span className={`text-lg font-bold ${textColor}`}>{d}</span>
           
           {reservation && isInBlock && (
-              <div className="self-end w-full flex justify-end items-center gap-1">
-                  <span className="text-[10px] uppercase font-black tracking-tighter opacity-90 text-white drop-shadow-sm">
-                    {reservation.status === 'confirmed' ? 'PAGADO' : 'PENDIENTE'}
-                  </span>
-                  <div className="bg-black/20 p-1 rounded-full backdrop-blur-sm">
-                      {reservation.status === 'confirmed' 
-                        ? <Check size={14} className="text-white" strokeWidth={3} /> 
-                        : <Clock size={14} className="text-white" strokeWidth={3} />
-                      }
-                  </div>
+              <div className="self-end bg-black/20 p-1.5 rounded-full backdrop-blur-sm">
+                  {reservation.status === 'confirmed' 
+                    ? <Check size={16} className="text-white" strokeWidth={3} /> 
+                    : <Clock size={16} className="text-white" strokeWidth={3} />
+                  }
               </div>
           )}
         </button>

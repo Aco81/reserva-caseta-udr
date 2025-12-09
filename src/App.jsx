@@ -40,22 +40,14 @@ import {
 
 // --- FIREBASE SETUP CON SEGURIDAD ---
 let app, auth, db;
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-try {
-  const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-  
-  if (firebaseConfig) {
-    // Evitar reinicializar si ya existe
-    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-    auth = getAuth(app);
-    db = getFirestore(app);
-  } else {
-    console.warn("Firebase config not found. App running in offline/demo mode.");
-  }
-} catch (e) {
-  console.error("Error initializing Firebase:", e);
-}
+const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "caseta-udr...",
+  projectId: "caseta-udr",
+  storageBucket: "...",
+  messagingSenderId: "...",
+  appId: "..."
+};
 
 // --- CONSTANTS ---
 const MASTER_ADMIN_ID = '123';

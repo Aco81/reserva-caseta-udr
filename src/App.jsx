@@ -52,26 +52,24 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
-// Usamos un ID fijo para asegurar que todos lean/escriban en el mismo sitio
-const appId = "caseta-udr-production"; 
+
+// IMPORTANTE: Usamos el ID dinámico del entorno para asegurar lectura/escritura correctas
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'caseta-udr-default';
 
 // --- CONSTANTS ---
 const MASTER_ADMIN_ID = '123';
 const MASTER_ADMIN_PASS = 'test';
 
-// 1. Archivo local
 const LOCAL_LOGO = "logo.svg";
-// 2. Fallback
 const ONLINE_LOGO = "https://www.lapreferente.com/imagenes/escudos/1286.png";
 
 // --- UTILS & HELPERS ---
 
 const getBlockStart = (date) => {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0); // Normalizar hora
+  d.setHours(0, 0, 0, 0); 
   const day = d.getDay(); 
   
-  // Calculamos para que el bloque siempre empiece el JUEVES anterior
   let diff = 0;
   if (day === 4) diff = 0; // Jueves
   if (day === 5) diff = -1; // Viernes
@@ -87,7 +85,6 @@ const getBlockStart = (date) => {
 };
 
 const formatDateId = (date) => {
-  // Aseguramos formato YYYY-MM-DD local consistente
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
@@ -100,7 +97,6 @@ const formatDisplayDate = (date) => {
 
 const isDateInBlock = (checkDate, blockStartDateStr) => {
   if (!blockStartDateStr) return false;
-  // Convertimos strings a fechas limpias a medianoche
   const blockStart = new Date(blockStartDateStr);
   blockStart.setHours(0,0,0,0);
   
@@ -109,12 +105,10 @@ const isDateInBlock = (checkDate, blockStartDateStr) => {
   
   const diffTime = check - blockStart;
   const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)); 
-  
-  // El bloque dura 6 días visualmente (Jueves, Viernes, Sabado, Domingo, Lunes, Martes)
   return diffDays >= 0 && diffDays <= 5;
 };
 
-// --- COMPONENT: ROBUST LOGO LOADER ---
+// --- COMPONENT: LOGO ---
 const UDRLogo = ({ className }) => {
   const [src, setSrc] = useState(LOCAL_LOGO);
   const [hasError, setHasError] = useState(false);
@@ -181,7 +175,9 @@ const Modal = ({
   
   let daysLeft = 0;
   if (res && res.createdAt) {
-    const diff = (new Date() - res.createdAt.toDate()) / (1000 * 60 * 60 * 24);
+    // Protección contra null en createdAt (latencia local)
+    const createdDate = res.createdAt.toDate ? res.createdAt.toDate() : new Date();
+    const diff = (new Date() - createdDate) / (1000 * 60 * 60 * 24);
     daysLeft = Math.max(0, 5 - Math.ceil(diff));
   }
 
@@ -682,11 +678,14 @@ export default function App() {
         const data = docSnap.data();
         let isExpired = false;
         if (data.status === 'pending' && data.createdAt) {
-          const created = data.createdAt.toDate();
-          const diffDays = (now - created) / (1000 * 60 * 60 * 24);
-          if (diffDays > 5) {
-            isExpired = true;
-            deleteDoc(docSnap.ref); // Limpieza automática
+          // Check createdAt exists (to avoid local latency null issues)
+          if(data.createdAt) {
+             const created = data.createdAt.toDate ? data.createdAt.toDate() : new Date();
+             const diffDays = (now - created) / (1000 * 60 * 60 * 24);
+             if (diffDays > 5) {
+               isExpired = true;
+               deleteDoc(docSnap.ref); // Limpieza automática
+             }
           }
         }
         if (!isExpired) resData.push({ id: docSnap.id, ...data });
@@ -699,7 +698,6 @@ export default function App() {
     const unsubAdmins = onSnapshot(qAdmins, (snapshot) => {
       const adData = [];
       snapshot.forEach(doc => {
-        // Aseguramos que tenemos el ID
         adData.push({ id: doc.id, ...doc.data() });
       });
       setAdmins(adData);
@@ -855,35 +853,28 @@ export default function App() {
       // Find reservation by matching exact ID string
       const reservation = reservations.find(r => r.id === blockId);
       
-      // Styling logic
-      let bgColor = 'bg-white/10';
-      let borderColor = 'border-transparent';
-      let textColor = 'text-white/30';
-      let shadow = '';
-
+      // Force direct styles for guaranteed feedback
+      let cellStyle = {};
+      let textColor = 'text-gray-400';
+      
       if (isInBlock) {
           textColor = 'text-gray-800';
-          if (reservation) {
-              if (reservation.status === 'confirmed') {
-                  // PAGADO: Rojo Intenso
-                  bgColor = '!bg-gradient-to-br from-red-600 to-red-800';
-                  borderColor = 'border-red-900';
-                  textColor = 'text-white';
-                  shadow = 'shadow-red-900/50 shadow-lg';
-              } else {
-                  // PENDIENTE: Naranja Solar
-                  bgColor = '!bg-gradient-to-br from-orange-400 to-orange-500';
-                  borderColor = 'border-orange-600';
-                  textColor = 'text-white';
-                  shadow = 'shadow-orange-500/50 shadow-lg';
-              }
+          if (!reservation) {
+             // Free
+             cellStyle = { background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderColor: '#34d399' };
+             textColor = 'text-white';
+          } else if (reservation.status === 'confirmed') {
+             // Paid
+             cellStyle = { background: 'linear-gradient(135deg, #b91c1c 0%, #991b1b 100%)', borderColor: '#991b1b' };
+             textColor = 'text-white';
           } else {
-             // LIBRE: Verde Esmeralda
-             bgColor = '!bg-gradient-to-br from-emerald-400 to-emerald-600 hover:from-emerald-300 hover:to-emerald-500 cursor-pointer';
-             borderColor = 'border-emerald-300'; 
-             textColor = 'text-white font-black drop-shadow-md';
-             shadow = 'shadow-emerald-500/30 shadow-lg';
+             // Pending
+             cellStyle = { background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', borderColor: '#ea580c' };
+             textColor = 'text-white';
           }
+      } else {
+          cellStyle = { background: 'rgba(255,255,255,0.05)', borderColor: 'transparent' };
+          textColor = 'text-white/30';
       }
 
       days.push(
@@ -891,7 +882,8 @@ export default function App() {
           key={`${blockId}-${d}-${reservation?.status || 'none'}`}
           onClick={() => isInBlock ? handleDayClick(date) : null}
           disabled={!isInBlock}
-          className={`h-20 sm:h-24 rounded-2xl border flex flex-col items-start justify-between p-2 transition-all relative ${bgColor} ${borderColor} ${shadow} ${isInBlock && !reservation ? 'hover:scale-[1.05] active:scale-95' : ''}`}
+          className={`h-20 sm:h-24 rounded-2xl border flex flex-col items-start justify-between p-2 transition-all relative shadow-lg ${isInBlock && !reservation ? 'hover:scale-[1.05] active:scale-95' : ''}`}
+          style={cellStyle}
         >
           <span className={`text-lg font-bold ${textColor}`}>{d}</span>
           

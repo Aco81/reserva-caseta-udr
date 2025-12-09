@@ -38,16 +38,22 @@ import {
   XCircle
 } from 'lucide-react';
 
-// --- FIREBASE SETUP CON SEGURIDAD ---
-let app, auth, db;
+// --- FIREBASE SETUP ---
+// Configuración exacta extraída de tu captura de pantalla
 const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "caseta-udr...",
+  apiKey: "AIzaSyA0gbmO9wtNlrfiSW2O2U-j9WmvOlZliWs",
+  authDomain: "caseta-udr.firebaseapp.com",
   projectId: "caseta-udr",
-  storageBucket: "...",
-  messagingSenderId: "...",
-  appId: "..."
+  storageBucket: "caseta-udr.firebasestorage.app",
+  messagingSenderId: "1089475835556",
+  appId: "1:1089475835556:web:8f702ca471e5318d1d5831"
 };
+
+// Inicialización de Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = "caseta-udr"; 
 
 // --- CONSTANTS ---
 const MASTER_ADMIN_ID = '123';
